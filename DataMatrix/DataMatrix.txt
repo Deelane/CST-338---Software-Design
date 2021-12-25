@@ -1,0 +1,756 @@
+/***
+
+ DataMatrix Program
+
+ By:
+ Delaney Nikoofekr
+ Christopher Flores
+ Fernando Arozqueta
+
+ Program:
+
+ Converts String arrays of asterisks and spaces into BarcodeImages (2d matrices)
+ Decodes BarcodeImages into text output
+ Encodes text input into BarcodeImages
+
+ ***/
+
+public class Assig4
+{
+   public static void main(String[] args)
+   {
+      String[] sImageIn =
+              {
+                      "                                               ",
+                      "                                               ",
+                      "                                               ",
+                      "     * * * * * * * * * * * * * * * * * * * * * ",
+                      "     *                                       * ",
+                      "     ****** **** ****** ******* ** *** *****   ",
+                      "     *     *    ****************************** ",
+                      "     * **    * *        **  *    * * *   *     ",
+                      "     *   *    *  *****    *   * *   *  **  *** ",
+                      "     *  **     * *** **   **  *    **  ***  *  ",
+                      "     ***  * **   **  *   ****    *  *  ** * ** ",
+                      "     *****  ***  *  * *   ** ** **  *   * *    ",
+                      "     ***************************************** ",
+                      "                                               ",
+                      "                                               ",
+                      "                                               "
+
+              };
+
+      String[] sImageIn_2 =
+              {
+                      "                                          ",
+                      "                                          ",
+                      "* * * * * * * * * * * * * * * * * * *     ",
+                      "*                                    *    ",
+                      "**** *** **   ***** ****   *********      ",
+                      "* ************ ************ **********    ",
+                      "** *      *    *  * * *         * *       ",
+                      "***   *  *           * **    *      **    ",
+                      "* ** * *  *   * * * **  *   ***   ***     ",
+                      "* *           **    *****  *   **   **    ",
+                      "****  *  * *  * **  ** *   ** *  * *      ",
+                      "**************************************    ",
+                      "                                          ",
+                      "                                          ",
+                      "                                          ",
+                      "                                          "
+
+              };
+
+      BarcodeImage bc = new BarcodeImage(sImageIn);
+      DataMatrix dm = new DataMatrix(bc);
+
+      //First secret message
+      dm.translateImageToText();
+      dm.displayTextToConsole();
+      dm.displayImageToConsole();
+
+      //Second secret message
+      bc = new BarcodeImage(sImageIn_2);
+      dm.scan(bc);
+      dm.translateImageToText();
+      dm.displayTextToConsole();
+      dm.displayImageToConsole();
+
+      //Create your own message
+      dm.readText("What a great resume builder this is!");
+      dm.generateImageFromText();
+      dm.displayTextToConsole();
+      dm.displayImageToConsole();
+      System.out.println();
+   }
+}
+
+//Used by DataMatrix class
+interface BarcodeIO
+{
+   public boolean scan(BarcodeImage bc);
+
+   public boolean readText(String text);
+
+   public boolean generateImageFromText();
+
+   public boolean translateImageToText();
+
+   public void displayTextToConsole();
+
+   public void displayImageToConsole();
+}
+
+//Realizes all the essential data and methods associated with a 2D pattern
+//Converts 1d String array into 2d boolean array
+class BarcodeImage implements Cloneable
+{
+   //Exact internal dimensions of 2D data
+   public static final int MAX_HEIGHT = 30;
+   public static final int MAX_WIDTH = 65;
+
+   //Where image is stored
+   //False == white
+   //True == black
+   private boolean[][] imageData;
+
+   //Default constructor with all false imageData
+   BarcodeImage()
+   {
+      //instantiate boolean array
+      imageData = new boolean[MAX_HEIGHT][MAX_WIDTH];
+
+      //set data at all indexes to false
+      for (int i = 0; i < MAX_HEIGHT; i++)
+      {
+         for (int j = 0; j < MAX_WIDTH; j++)
+         {
+            imageData[i][j] = false;
+         }
+      }
+
+   }
+
+   //Takes a 1D array of Strings and converts it to the internal 2D array of booleans.
+   //Packs data into lower left corner of imageData array in case strData needs to take up all indexes
+   BarcodeImage(String[] strData)
+   {
+      //Ensures String array is valid
+      if(checkSize(strData))
+      {
+         //Instantiate imageData
+         imageData = new boolean[MAX_HEIGHT][MAX_WIDTH];
+
+         //Track current row and column of imageData
+         //Used to ensure strData values are packed into lower left corner of imageData
+         int currentRow = MAX_HEIGHT - 1;
+         int currentCol = 0;
+
+         //Iterate back to front over each String in strData array
+         for(int i = strData.length - 1; i >= 0; i--)
+         {
+            //Iterate left to right over each char in current String
+            for(int j = 0, stringLength = strData[i].length(); j < stringLength; j++)
+            {
+               //If we find an asterisk, set pixel at current row and column in imageData to true
+               if(strData[i].charAt(j) == '*')
+               {
+                  setPixel(currentRow, currentCol, true);
+               }
+
+               //Go right one column
+               currentCol++;
+
+               //Break if we go exceed max width
+               if (currentCol > MAX_WIDTH)
+               {
+                  break;
+               }
+            }
+
+            //Reset current column to 0
+            currentCol = 0;
+
+            //Go down one row
+            currentRow--;
+
+            //Break if we go can't go down any more rows
+            if (currentRow < 0)
+            {
+               break;
+            }
+         }
+      }
+   }
+
+   //Retrieves pixelData at location row, col in imageData
+   //Returns value of pixel, or false if bad row and/or column is passed
+   public boolean getPixel(int row, int col)
+   {
+      try
+      {
+         return imageData[row][col];
+      }
+      catch (ArrayIndexOutOfBoundsException e)
+      {
+         return false;
+      }
+   }
+
+   //Sets pixel to value if not out of bounds of imageData
+   //Returns false if bad row and/or column is passed
+   public boolean setPixel(int row, int col, boolean value)
+   {
+      try
+      {
+         imageData[row][col] = value;
+         return true;
+      }
+      catch (ArrayIndexOutOfBoundsException e)
+      {
+         return false;
+      }
+   }
+
+   //Checks the size of 1d String array data
+   //Only returns true if full String array can be stored within max height and width
+   private boolean checkSize(String[] data)
+   {
+      return (data.length < MAX_HEIGHT) && (data[0].length() < MAX_WIDTH);
+   }
+
+   //Displays imageData to console for debugging
+   public void displayToConsole()
+   {
+      //Iterates over every pixel in imageData
+      for (int i = 0; i < MAX_HEIGHT; i++)
+      {
+         for (int j = 0; j < MAX_WIDTH; j++)
+         {
+            //Prints asterisk for true, space for false
+            if (imageData[i][j])
+            {
+               System.out.print('*');
+            }
+            else
+            {
+               System.out.print(' ');
+            }
+         }
+         System.out.println();
+      }
+   }
+
+   //Overrides clone() from interface
+   //Returns clone of "this"
+   @Override
+   public Object clone() throws CloneNotSupportedException
+   {
+      BarcodeImage clone;
+      clone = (BarcodeImage) super.clone();
+      return clone;
+   }
+}
+
+class DataMatrix implements BarcodeIO
+{
+   public static final char BLACK_CHAR = '*';
+   public static final char WHITE_CHAR = ' ';
+
+   /*Single internal copy of any image scanned-in,
+     passed into the constructor,
+     or created by BarcodeIO's generateImageFromText(*/
+   private BarcodeImage image;
+
+   /*Single internal copy of any text read-in,
+   passed into the constructor,
+   or created by BarcodeIO's translateImageToText().*/
+   private String text;
+
+   //Represent the actual portion of the BarcodeImage that has the real signal.
+   private int actualWidth, actualHeight;
+
+   //Default Constructor - Constructs an empty, but non-null, image and text value
+   public DataMatrix()
+   {
+      this.text = "";
+      this.image = new BarcodeImage();
+      this.actualHeight = 0;
+      this.actualWidth = 0;
+   }
+
+   //Default Constructor - Sets the image but leaves the text as default value.
+   public DataMatrix(BarcodeImage image)
+   {
+      this();
+      scan(image);
+   }
+
+   //Default Constructor - Sets the text but leaves the image as default value.
+   public DataMatrix(String text)
+   {
+      this();
+      readText(text);
+   }
+
+   //Sets String text passed in to text of "this"
+   public boolean readText(String text)
+   {
+      //Returns false if String is empty or exceeds max width
+      if(text.equals("") || (text.length() > BarcodeImage.MAX_WIDTH - 2))
+      {
+         return false;
+      }
+      this.text = text;
+      return true;
+
+   }
+
+   //Sets image and calls helper methods to determine data members
+   public boolean scan(BarcodeImage bc)
+   {
+      //Ensure bc isn't null
+      if (bc != null)
+      {
+         try
+         {
+            //Clones passed in BarcodeImage
+            this.image = (BarcodeImage) bc.clone();
+
+            //Ensures image is bottom left justified
+            cleanImage();
+
+            //Computes and sets actual width and height of signal
+            this.actualWidth = computeSignalWidth();
+            this.actualHeight = computeSignalHeight();
+
+            return true;
+         }
+         //This should never happen
+         catch (CloneNotSupportedException e)
+         {
+            return false;
+         }
+      }
+
+      //bc was null
+      return false;
+   }
+
+   //Returns actualWidth
+   public int getActualWidth()
+   {
+      return actualWidth;
+   }
+
+   //Returns actualHeight
+   public int getActualHeight()
+   {
+      return actualHeight;
+   }
+
+   //Returns width of the image
+   private int computeSignalWidth()
+   {
+      int signalWidth = 0;
+      for (int i = 0; i < BarcodeImage.MAX_WIDTH; i++)
+      {
+         if (image.getPixel(BarcodeImage.MAX_HEIGHT - 1, i))
+         {
+            signalWidth++;
+         }
+         else
+         {
+            break;
+         }
+      }
+      return signalWidth;
+   }
+
+   //Returns height of the image
+   private int computeSignalHeight()
+   {
+      int signalHeight = 0;
+      for (int i = BarcodeImage.MAX_HEIGHT - 1; i >= 0; i--)
+      {
+         if (this.image.getPixel(i, 0))
+         {
+            signalHeight++;
+         }
+         else
+         {
+            break;
+         }
+      }
+      return signalHeight;
+   }
+
+   //Justifies image to the lower left of the 2D array
+   private void cleanImage()
+   {
+      //ints to track where the bottom boundary starts
+      int signalStartColumn = 0;
+      int signalStartRow = 0;
+
+      //Label for outer loop for break statement
+      outerloop:
+      //Iterates over image, bottom to top left to right
+      for (int i = BarcodeImage.MAX_HEIGHT - 1; i >= 0; i--)
+      {
+         for(int j = 0; j < BarcodeImage.MAX_WIDTH; j++)
+         {
+            //The first pixel that returns true signals the start of the bottom boundary
+            if(image.getPixel(i, j))
+            {
+               //Set actual row and column start
+               signalStartRow = i;
+               signalStartColumn = j;
+
+               //Break since we're done
+               break outerloop;
+            }
+         }
+      }
+
+      /*
+       Iterates over image from actual start
+       Copies image boolean values to lower left, one by one
+       */
+
+      //Bottom row
+      int row = BarcodeImage.MAX_HEIGHT - 1;
+
+      //Iterate bottom to top over image rows from actual start
+      for (int i = signalStartRow; i >= 0; i--)
+      {
+         //Set current column to 0
+         int col = 0;
+
+         //iterate left to right over image columns from actual start
+         for(int j = signalStartColumn; j < BarcodeImage.MAX_WIDTH; j++)
+         {
+            //Copy of pixel at old row, column
+            boolean pixelCopy = image.getPixel(i, j);
+
+            //Copy pixel to new row, column
+            image.setPixel(row, col, pixelCopy);
+
+            //Go right a column
+            col++;
+         }
+
+         //Go down a row
+         row--;
+      }
+   }
+
+   //Displays a cropped version of the original image leaving out whitespace
+   public void displayImageToConsole()
+   {
+      //Create a dash border at the top of the image
+      for(int i = actualWidth + 2; i > 0; i--)
+      {
+         System.out.print("-");
+      }
+      System.out.print("\n");
+
+      //Iterate only over image with data and display each pixel to console
+      for (int i = BarcodeImage.MAX_HEIGHT - actualHeight; i < BarcodeImage.MAX_HEIGHT; i++)
+      {
+         //Opening border
+         System.out.print("|");
+
+         //Print actual image data
+         for (int j = 0; j < actualWidth; j++)
+         {
+            //Print black char (asterisk) for true, white char (space) for false
+            if(image.getPixel(i, j))
+            {
+               System.out.print(BLACK_CHAR);
+            }
+            else
+            {
+               System.out.print(WHITE_CHAR);
+            }
+         }
+
+         //Closing border
+         System.out.print("|" + "\n");
+      }
+   }
+
+   //Displays text to console
+   public void displayTextToConsole()
+   {
+      System.out.printf("\n***[%s]***\n", text);
+   }
+
+   //Displays full image including all white spaces
+   public void displayRawImage()
+   {
+      //Create a dash border at the top of the image
+      for(int i = BarcodeImage.MAX_WIDTH + 2; i > 0; i--)
+      {
+         System.out.print("-");
+      }
+      System.out.print("\n");
+
+      //Iterate over whole image, including whitespace and display each pixel to console
+      for (int i = 0; i < BarcodeImage.MAX_HEIGHT; i++)
+      {
+         //Opening border
+         System.out.print("|");
+
+         //Print image data
+         for (int j = 0; j < BarcodeImage.MAX_WIDTH; j++)
+         {
+            //Print black char (asterisk) for true, white char (space) for false
+            if(image.getPixel(i, j))
+            {
+               System.out.print(BLACK_CHAR);
+            }
+            else
+            {
+               System.out.print(WHITE_CHAR);
+            }
+         }
+
+         //Closing border
+         System.out.print("|" + "\n");
+      }
+   }
+
+   //Resets all pixels in image to false
+   private void clearImage()
+   {
+      for (int i = 0; i < BarcodeImage.MAX_HEIGHT; i++)
+      {
+         for (int j = 0; j < BarcodeImage.MAX_WIDTH; j++)
+         {
+            image.setPixel(i, j, false);
+         }
+      }
+   }
+
+   //Decodes char from column in image
+   private char readCharFromCol(int col)
+   {
+
+      int charValue = 0;
+      int counter = 0;
+
+      //Iterate over actual data from bottom to top, excluding boundaries
+      for(int i = BarcodeImage.MAX_HEIGHT - 2; i > BarcodeImage.MAX_HEIGHT - actualHeight; i--)
+      {
+         //Each row has a value of 2 ^ counter
+         //Counter starts at 0 for the bottom row, and increases by 1 for each row up
+         //Char value is increased by 2 ^ counter for every row in current column with a true pixel
+         if(image.getPixel(i, col))
+         {
+            charValue = charValue + (int)Math.pow(2, counter);
+         }
+         counter++;
+      }
+      //Convert int to char and return
+      return (char)(charValue);
+   }
+
+   //Generates an image from text in "this"
+   //Clears image, generates borders, and writes each character to a column in binary
+   public boolean generateImageFromText()
+   {
+      //Ensure canvas is blank
+      clearImage();
+
+      //Grab size of text, store it
+      int textSize = text.length();
+
+      //Need 7 rows to generate a possible 128 numbers (2^7)
+      //Max ASCII value is lowercase z at 122, so 7 rows is enough
+      //9 rows to account for ceiling and floor
+      //topBoundary will be max height index (29) - 9, so 20
+      int topBoundary = (BarcodeImage.MAX_HEIGHT - 1) - 9;
+
+      //Generates borders only
+      generateBorders(textSize, topBoundary);
+
+      //Iterate over every single character in text
+      for(int i = 0; i < textSize; i++)
+      {
+         //Cast current character into ASCII integer
+         int convertChar = (int) text.charAt(i);
+
+         //Write current character to column
+         //Writes each character from very left (0), to right (textsize - 1)
+         //Column starts at i + 1 to account for left border
+         writeCharToCol(i + 1, convertChar, topBoundary);
+      }
+
+      //Ensures image is bottom left justified
+      cleanImage();
+
+      return true;
+   }
+
+   //Generates borders of image
+   private boolean generateBorders(int textSize, int topBoundary)
+   {
+      //Ensure we have text before continuing
+      if (textSize < 0)
+      {
+         return false;
+      }
+
+      //Must account for left and right borders around the text
+      int totalLength = textSize + 2;
+
+      /**Print bottom border**/
+      //Iterate left to right from 0 to textsize
+      for (int i = 0; i < totalLength; i++)
+      {
+         //Create bottom solid border
+         image.setPixel(BarcodeImage.MAX_HEIGHT - 1, i, true);
+      }
+
+      /**Print left and right borders**/
+      //Start at max height - 2 since we already set the bottom row
+      for (int i = BarcodeImage.MAX_HEIGHT - 2; i > topBoundary; i--)
+      {
+         //If i is odd
+         if (i % 2 != 0)
+         {
+            //Set leftmost pixel to true
+            image.setPixel(i, 0, true);
+
+            //set rightmost pixel to true
+            image.setPixel(i, totalLength - 1, true);
+         }
+         //If i is even
+         else
+         {
+            //Set leftmost pixel to true
+            image.setPixel(i, 0, true);
+         }
+      }
+
+      /**Print top border**/
+      //Iterate left to right from 0 to textsize
+      for (int i = 0; i < totalLength; i++)
+      {
+         //If i is even
+         if (i % 2 == 0)
+         {
+            //Set current row pixel to true
+            image.setPixel(topBoundary, i, true);
+         }
+      }
+      return true;
+   }
+
+   //Takes a character and writes it as a single column in image
+   private boolean writeCharToCol(int col, int code, int topBoundary)
+   {
+      //Convert code to binary string
+      String binary = Integer.toBinaryString(code);
+
+      //Convert binary string to char array
+      char colChar[] = new char[binary.length()];
+      colChar = binary.toCharArray();
+
+      //Set character array iterator to initial value
+      int counter = colChar.length - 1;
+
+      //Begin writing character to column
+      //Iterates from bottom to top excluding the boundaries (starts at max height - 2)
+      for(int i = BarcodeImage.MAX_HEIGHT - 2; i > topBoundary; i--)
+      {
+         //Write binary code image
+         if(counter >= 0)
+         {
+            if (colChar[counter] == '1')
+            {
+               image.setPixel(i, col, true);
+            }
+            else
+            {
+               image.setPixel(i, col, false);
+            }
+         }
+         //decrement colChar iterator
+         counter--;
+      }
+      return true;
+   }
+
+   //Decodes image into text String
+   @Override
+   public boolean translateImageToText()
+   {
+      //Stores each decoded character
+      //Length actualWidth - 2 to exclude left and right boundaries
+      char colChar[] = new char[actualWidth - 2];
+
+      //Iterate over each column in image
+      //Start at 1 to exclude boundary
+      //End before actualWidth - 1 to exclude boundary
+      for (int i = 1; i < actualWidth - 1; i++)
+      {
+         //Decode char from column and store it in array
+         //i - 1 to account for
+         colChar[i - 1] = readCharFromCol(i);
+      }
+
+      //Convert char array to String
+      String colString = new String(colChar);
+
+      //Store decoded String into text and return
+      this.text = colString;
+      return true;
+   }
+}
+
+/*** OUTPUT
+
+ ***[CSUMB CSIT online program is top notch.]***
+ -------------------------------------------
+ |* * * * * * * * * * * * * * * * * * * * *|
+ |*                                       *|
+ |****** **** ****** ******* ** *** *****  |
+ |*     *    ******************************|
+ |* **    * *        **  *    * * *   *    |
+ |*   *    *  *****    *   * *   *  **  ***|
+ |*  **     * *** **   **  *    **  ***  * |
+ |***  * **   **  *   ****    *  *  ** * **|
+ |*****  ***  *  * *   ** ** **  *   * *   |
+ |*****************************************|
+
+ ***[You did it!  Great work.  Celebrate.]***
+ ----------------------------------------
+ |* * * * * * * * * * * * * * * * * * * |
+ |*                                    *|
+ |**** *** **   ***** ****   *********  |
+ |* ************ ************ **********|
+ |** *      *    *  * * *         * *   |
+ |***   *  *           * **    *      **|
+ |* ** * *  *   * * * **  *   ***   *** |
+ |* *           **    *****  *   **   **|
+ |****  *  * *  * **  ** *   ** *  * *  |
+ |**************************************|
+
+ ***[What a great resume builder this is!]***
+ ----------------------------------------
+ |* * * * * * * * * * * * * * * * * * * |
+ |*                                    *|
+ |***** * ***** ****** ******* **** **  |
+ |* ************************************|
+ |**  *    *  * * **    *    * *  *  *  |
+ |* *               *    **     **  *  *|
+ |**  *   * * *  * ***  * ***  *        |
+ |**      **    * *    *     *    *  * *|
+ |** *  * * **   *****  **  *    ** *** |
+ |**************************************|
+
+
+ Process finished with exit code 0
+
+ ***/
